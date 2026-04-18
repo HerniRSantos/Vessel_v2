@@ -15,9 +15,12 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
 app = FastAPI(title="VesselControl V2 API", description="FastAPI Backend for Maritime Intelligence")
 security = HTTPBasic()
 
-# Variáveis de Auth (Predefiniões de Segurança caso não exista .env)
-USERNAME = os.getenv("HUB_USER", "vessel")
-PASSWORD = os.getenv("HUB_PASS", "control2026")
+# Variáveis de Auth - requeridas via .env
+USERNAME = os.getenv("HUB_USER")
+PASSWORD = os.getenv("HUB_PASS")
+
+if not USERNAME or not PASSWORD:
+    raise ValueError("HUB_USER and HUB_PASS must be set in .env")
 
 def check_auth(credentials: HTTPBasicCredentials = Depends(security)):
     correct_username = secrets.compare_digest(credentials.username, USERNAME)
