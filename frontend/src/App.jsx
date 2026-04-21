@@ -1,121 +1,110 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useEffect, useCallback } from 'react';
+import VesselMap from './components/VesselMap';
+import Sidebar from './components/Sidebar';
+import VesselModal from './components/VesselModal';
+import './index.css';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [vessels, setVessels] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedVessel, setSelectedVessel] = useState(null);
+  const [modalMmsi, setModalMmsi] = useState(null);
+
+  const fetchVessels = useCallback(async () => {
+    try {
+      const res = await fetch('/api/vessels/live', { credentials: 'include' });
+      if (!res.ok) {
+        if (res.status === 401) {
+          setError('Unauthorized - please login');
+          return;
+        }
+        throw new Error('Failed to fetch vessels');
+      }
+      const data = await res.json();
+      setVessels(data);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchVessels();
+    const interval = setInterval(fetchVessels, 5000);
+    return () => clearInterval(interval);
+  }, [fetchVessels]);
+
+  const handleVesselClick = (vessel) => {
+    setSelectedVessel(vessel);
+    setModalMmsi(vessel.mmsi);
+  };
+
+  const handleModalClose = () => {
+    setModalMmsi(null);
+  };
+
+  const handleVesselUpdate = (updatedVessel) => {
+    setVessels(prev => prev.map(v => 
+      v.mmsi === updatedVessel.mmsi ? { ...v, ...updatedVessel } : v
+    ));
+    if (selectedVessel && selectedVessel.mmsi === updatedVessel.mmsi) {
+      setSelectedVessel({ ...selectedVessel, ...updatedVessel });
+    }
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="flex h-screen w-screen overflow-hidden">
+      {/* Map */}
+      <div className="flex-1 relative">
+        <VesselMap 
+          vessels={vessels} 
+          onVesselClick={handleVesselClick}
+        />
+        
+        {/* Top Bar */}
+        <div className="absolute top-5 left-1/2 -translate-x-1/2 z-[1000]">
+          <div className="flex items-center gap-4 bg-[rgba(16,20,30,0.92)] px-6 py-3 rounded-full border border-white/15 backdrop-blur-xl shadow-lg">
+            <div className={`w-2.5 h-2.5 rounded-full ${error ? 'bg-red-500' : 'bg-green-400'} shadow-[0_0_10px_currentColor]`} />
+            <h1 className="text-sm uppercase tracking-[3px] font-semibold">
+              VesselControl <span className="font-light opacity-60">Intel</span>
+            </h1>
+          </div>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
 
-      <div className="ticks"></div>
+        {/* Loading/Error States */}
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-[1000]">
+            <div className="text-cyan-400 animate-pulse">A carregar embarcações...</div>
+          </div>
+        )}
+        
+        {error && (
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[1000] bg-red-500/20 border border-red-500 px-4 py-2 rounded-lg text-red-400">
+            Erro: {error}
+          </div>
+        )}
+      </div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* Sidebar */}
+      <Sidebar 
+        vessels={vessels} 
+        onVesselClick={handleVesselClick}
+      />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {/* Modal */}
+      {modalMmsi && (
+        <VesselModal 
+          mmsi={modalMmsi}
+          onClose={handleModalClose}
+          onSave={handleVesselUpdate}
+        />
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
