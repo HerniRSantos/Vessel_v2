@@ -1,84 +1,55 @@
-import sqlite3
 import os
+from urllib.parse import quote_plus
+import sqlalchemy as sa
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
+from contextlib import contextmanager
+from dotenv import load_dotenv
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'vessels_v2.db')
+load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    # Ativa o modo WAL (Melhor para escritas concorrentes)
-    conn.execute('PRAGMA journal_mode=WAL')
-    conn.execute('PRAGMA synchronous=NORMAL')
-    
-    cursor = conn.cursor()
-    
-    # Tabela mestre das embarcações
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS vessels_master (
-            mmsi INTEGER PRIMARY KEY,
-            name TEXT,
-            vessel_type TEXT DEFAULT 'Desconhecido',
-            flag TEXT,
-            dimension_a INTEGER,
-            dimension_b INTEGER,
-            dimension_c INTEGER,
-            dimension_d INTEGER,
-            callsign TEXT,
-            imo_number TEXT,
-            last_updated TEXT,
-            suspicious INTEGER DEFAULT 0,
-            suspect_reason TEXT DEFAULT '',
-            notes TEXT DEFAULT '',
-            position_count INTEGER DEFAULT 0,
-            first_seen TEXT,
-            last_seen TEXT,
-            destination TEXT,
-            eta TEXT,
-            draft REAL
-        )
-    ''')
-    
-    # Tabela de histórico de posições
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS positions_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mmsi INTEGER,
-            lat REAL,
-            lon REAL,
-            speed REAL,
-            course REAL,
-            true_heading REAL,
-            nav_status INTEGER,
-            timestamp TEXT,
-            FOREIGN KEY (mmsi) REFERENCES vessels_master(mmsi)
-        )
-    ''')
-    
-    # Tabela de Ocorrências e Ameaças
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS occurrences (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mmsi INTEGER,
-            severity TEXT, 
-            description TEXT,
-            timestamp TEXT,
-            FOREIGN KEY (mmsi) REFERENCES vessels_master(mmsi)
-        )
-    ''')
-    
-    # Índices para relatórios rápidos
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_mmsi_time ON positions_history(mmsi, timestamp)')
-    
-    conn.commit()
-    conn.close()
+DB_CONFIG = {
+    "host": os.getenv("PG_HOST", "localhost"),
+    "port": os.getenv("PG_PORT", "5432"),
+    "database": os.getenv("PG_DB", "vessels_db"),
+    "user": os.getenv("PG_USER", "vessel_user"),
+    "password": os.getenv("PG_PASSWORD", "vessel_pass_2026"),
+}
 
+PG_URL = (
+    f"postgresql://{DB_CONFIG['user']}:{quote_plus(DB_CONFIG['password'])}"
+    f"@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
+)
+
+engine = create_engine(PG_URL, poolclass=NullPool, echo=False)
+
+
+@contextmanager
 def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    # É imperativo usar pequenos timeouts em WAL mode se algo travar a escrita
-    conn.execute('PRAGMA busy_timeout = 3000') 
-    return conn
+    conn = engine.connect()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
-if __name__ == '__main__':
-    print("Initializing Database Architecture V2...")
-    init_db()
-    print("Database ready.")
+
+def get_engine():
+    return engine
+
+
+def test_connection() -> bool:
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception as e:
+        print(f"DB error: {e}")
+        return False
+
+
+if __name__ == "__main__":
+    print("Testing database connection...")
+    if test_connection():
+        print("Database connection OK")
+    else:
+        print("Database connection FAILED")

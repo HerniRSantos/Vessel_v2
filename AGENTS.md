@@ -1,64 +1,70 @@
-# Vessel_v2
+# Vessel_v2 - AIS Maritime Intelligence System
 
 ## Quick Start
+
 ```bash
-# Ativar venv primeiro (senão importações falham)
+# Docker (recommended)
+docker compose up -d
+
+# Or direct (requires venv + PostgreSQL running)
 source venv/bin/activate
-
-# Arrancar tudo (API + DB init)
 python3 launcher.py
-
-# Apenas API (sem launcher)
-python3 -m uvicorn backend.api_server:app --host 0.0.0.0 --port 8000
-```
-
-## Development
-```bash
-cd frontend && npm run dev   # Frontend dev server
-cd frontend && npm run build  # Production build
 ```
 
 ## Auth
-- Basic auth (valores definidos em .env para produção)
+- User: `vessel`
+- Pass: `control2026`
 
 ## Architecture
 | File | Purpose |
 |------|---------|
-| `backend/api_server.py` | FastAPI + static files + auth |
-| `backend/database.py` | SQLite WAL schema |
+| `backend/api_server.py` | FastAPI + auth + PostgreSQL |
+| `backend/database.py` | PostgreSQL connection |
+| `backend/ais_ingestor.py` | AIS WebSocket stream listener |
 | `launcher.py` | Service orchestrator |
-| `frontend/dist/` | Built React assets |
-
-## Endpoints
-| Route | Auth | Description |
-|-------|------|-------------|
-| `/api/` | Basic | API status |
-| `/api/vessels` | Basic | All vessels |
-| `/api/vessels/live` | Basic | Latest positions |
-| `/` | Basic | Frontend SPA |
+| `docker-compose.yml` | Full stack (API + Ingestor + PostgreSQL) |
 
 ## Database
-- Path: `backend/vessels_v2.db`
-- Tables: `vessels_master`, `positions_history`, `occurrences`
-- WAL mode enabled
+- **PostgreSQL 16 + PostGIS 3.4** (Docker container: `vessel_v2_db`)
+- Tables: `vessels_master`, `positions`, `positions_dlq`, `occurrences`
+- Raw message preservation: `positions.raw_msg` stores original NMEA JSON
+- DLQ: `positions_dlq` for rejected/spoofed messages
 
-## Skills (auto-carregadas por contexto)
-| Task | Skill |
-|------|-------|
-| UI React | `@[skills/tailwind-patterns]`, `@[skills/nextjs-react-expert]` |
-| API Backend | `@[skills/python-patterns]`, `@[skills/api-patterns]` |
-| Database | `@[skills/database-design]` |
-| Testing | `@[skills/webapp-testing]` |
-| Debugging | `@[skills/systematic-debugging]` |
+## API Endpoints
+| Route | Description |
+|-------|-------------|
+| `/api/health` | System + DB status |
+| `/api/vessels` | All vessels |
+| `/api/vessels/live` | Active vessels (< 1h) |
+| `/api/dark-vessels?hours=N` | Vessels inactive > N hours |
+| `/api/vessels/{mmsi}/gaps` | Signal gap detection |
+| `/api/dlq` | Dead letter queue |
 
-Local skills: `/home/kaus/Desktop/Kaus_Test/.agent/skills/`
+## AIS Stream
+- WebSocket: `wss://stream.aisstream.io/v0/stream`
+- BoundingBox in `.env` must be large enough to capture ships
+- Working config: `[[[-20, 20], [0, 60]]` (larger area = more data)
 
-## Quirks
-- CORS aberto (`allow_origins=["*"]`) - desenvolvimento apenas
-- Todos os endpoints requerem Basic auth
-- Se servidor continuar em background após Ctrl+C: `pkill -f uvicorn`
-- O `.env` carrega de `../.env` (mesma raiz do projeto)
+## Docker Commands
+```bash
+# Start all services
+docker compose up -d
+
+# View logs
+docker logs vessel_v2_ingestor
+docker logs vessel_v2_api
+
+# Restart a service
+docker compose restart ingestor
+```
+
+## Known Issues
+- **aisstream.io**: Sometimes closes connection immediately. Retry logic handles this.
+- **BoundingBox**: Too small = no messages. Use `[[[-20, 20], [0, 60]]` or larger.
+- Connection: `localhost:5432` (PostgreSQL), `localhost:8000` (API)
 
 ## Important
-- Ativar venv **antes** de qualquer comando Python
-- Build do frontend vai para `frontend/dist/`, servida na root `/`
+- CORS open for development only
+- All endpoints require Basic auth
+- PostgreSQL must be running before API starts
+- If ports conflict: `pkill -f uvicorn`

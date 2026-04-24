@@ -1,0 +1,39 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vessel_v2_api
+    network_mode: host
+    environment:
+      DATABASE_URL: postgresql://vessel_user:vessel_pass_2026@localhost:5432/vessels_db
+      PG_HOST: localhost
+      PG_PORT: 5432
+      PG_DB: vessels_db
+      PG_USER: vessel_user
+      PG_PASSWORD: vessel_pass_2026
+      HUB_USER: vessel
+      HUB_PASS: control2026
+      AIS_API_KEY: ${AIS_API_KEY}
+      AIS_BBOX: ${AIS_BBOX}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  ingestor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vessel_v2_ingestor
+    network_mode: host
+    command: ["python3", "backend/ais_ingestor.py"]
+    environment:
+      DATABASE_URL: postgresql://vessel_user:vessel_pass_2026@localhost:5432/vessels_db
+      PG_HOST: localhost
+      PG_PORT: 5432
+      PG_DB: vessels_db
+      PG_USER: vessel_user
+      PG_PASSWORD: vessel_pass_2026
+      AIS_API_KEY: ${AIS_API_KEY}
+      AIS_BBOX: ${AIS_BBOX}
+    restart: unless-stopped

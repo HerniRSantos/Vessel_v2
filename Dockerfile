@@ -2,13 +2,24 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system deps
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    curl \
+    postgresql-client \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Python deps
-RUN pip install --no-cache-dir fastapi uvicorn python-dotenv websockets requests
+RUN pip install --no-cache-dir \
+    fastapi \
+    uvicorn \
+    python-dotenv \
+    websockets \
+    requests \
+    sqlalchemy \
+    asyncpg \
+    psycopg2-binary \
+    structlog
 
-# Copy app
 COPY backend/ /app/backend/
 COPY frontend/dist/ /app/frontend/dist/
 COPY .env /app/.env
