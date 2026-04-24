@@ -23,13 +23,17 @@ def init_db():
             dimension_c INTEGER,
             dimension_d INTEGER,
             callsign TEXT,
+            imo_number TEXT,
             last_updated TEXT,
             suspicious INTEGER DEFAULT 0,
             suspect_reason TEXT DEFAULT '',
             notes TEXT DEFAULT '',
             position_count INTEGER DEFAULT 0,
             first_seen TEXT,
-            last_seen TEXT
+            last_seen TEXT,
+            destination TEXT,
+            eta TEXT,
+            draft REAL
         )
     ''')
     

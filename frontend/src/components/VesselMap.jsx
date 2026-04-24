@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { getVesselTrail } from '../lib/api';
 
 const SHIP_PATHS = {
   cargo: 'M12 2 L20 10 L20 40 L4 40 L4 10 Z',
@@ -30,14 +31,15 @@ function getMarkerColor(suspicious) {
   return suspicious ? '#ff3d5a' : '#00ff9d';
 }
 
-function createVesselIcon(type, suspicious, course = 0) {
+function createVesselIcon(type, suspicious, true_heading = 0) {
   const color = getMarkerColor(suspicious);
   const svgPath = getVesselPath(type);
+  const rotation = true_heading || 0;
   
   return L.divIcon({
     className: 'vessel-div-icon',
     html: `
-      <div style="transform: rotate(${course}deg); width: 24px; height: 48px;">
+      <div style="transform: rotate(${rotation}deg); width: 24px; height: 48px;">
         <svg viewBox="0 0 24 48" width="24" height="48">
           <path d="${svgPath}" fill="${color}" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" />
         </svg>
@@ -52,6 +54,7 @@ function MapUpdater({ vessels, onVesselClick }) {
   const map = useMap();
   const markersRef = useRef({});
   const polylinesRef = useRef({});
+  const trailsLoadedRef = useRef({});
 
   useEffect(() => {
     const currentMmsi = new Set(vessels.map(v => v.mmsi));
@@ -67,16 +70,18 @@ function MapUpdater({ vessels, onVesselClick }) {
       if (!currentMmsi.has(parseInt(mmsi))) {
         map.removeLayer(polyline);
         delete polylinesRef.current[mmsi];
+        delete trailsLoadedRef.current[mmsi];
       }
     });
 
     vessels.forEach(vessel => {
-      const { mmsi, lat, lon, type, suspicious, course, name } = vessel;
+      const { mmsi, lat, lon, type, suspicious, course, true_heading, name } = vessel;
       if (!lat || !lon) return;
 
       const key = mmsi.toString();
       const pos = [lat, lon];
-      const icon = createVesselIcon(type, suspicious, course);
+      const heading = true_heading || course || 0;
+      const icon = createVesselIcon(type, suspicious, heading);
 
       if (markersRef.current[key]) {
         const marker = markersRef.current[key];
@@ -86,7 +91,7 @@ function MapUpdater({ vessels, onVesselClick }) {
           <div class="font-semibold">${name || `MMSI: ${mmsi}`}</div>
           <div class="opacity-70">${type || 'Desconhecido'}</div>
           <div class="${suspicious ? 'text-red-400' : 'text-green-400'} font-semibold">
-            ${suspicious ? '⚠ SUSPEITA' : '✓ SEM ALERTAS'}
+            ${suspicious ? '⚠ SUSPEITA' : '��� SEM ALERTAS'}
           </div>
         `;
         marker.setTooltipContent(tooltipContent);
@@ -106,6 +111,25 @@ function MapUpdater({ vessels, onVesselClick }) {
         });
         marker.on('click', () => onVesselClick(vessel));
         markersRef.current[key] = marker;
+      }
+
+      if (!trailsLoadedRef.current[key]) {
+        trailsLoadedRef.current[key] = true;
+        getVesselTrail(mmsi).then(data => {
+          if (data.trail && data.trail.length > 1) {
+            const latlngs = data.trail.map(p => [p.lat, p.lon]);
+            if (polylinesRef.current[key]) {
+              map.removeLayer(polylinesRef.current[key]);
+            }
+            const polyline = L.polyline(latlngs, {
+              color: suspicious ? '#ff3d5a' : '#00ff9d',
+              weight: 2,
+              opacity: 0.6,
+              dashArray: '5, 10'
+            }).addTo(map);
+            polylinesRef.current[key] = polyline;
+          }
+        }).catch(console.error);
       }
     });
 

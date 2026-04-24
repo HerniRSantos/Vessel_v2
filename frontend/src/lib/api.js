@@ -42,6 +42,10 @@ export async function getVesselHistory(mmsi, hours = 24) {
   return fetchWithAuth(`${API_BASE}/vessel/${mmsi}/history?hours=${hours}`);
 }
 
+export async function getVesselTrail(mmsi) {
+  return fetchWithAuth(`${API_BASE}/vessels/trail/${mmsi}`);
+}
+
 export async function exportVessels() {
   const res = await fetch(`${API_BASE}/vessels/export`, {
     credentials: 'include',

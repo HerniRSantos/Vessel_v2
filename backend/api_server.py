@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 import secrets
 import os
-from .database import get_db_connection
+from .database import get_db_connection, init_db
 from typing import List, Dict
 from dotenv import load_dotenv
 
@@ -63,6 +63,7 @@ def get_vessels(username: str = Depends(check_auth)):
 def get_live_positions(username: str = Depends(check_auth)):
     try:
         conn = get_db_connection()
+        # Apenas vessels ativos na última hora
         query = '''
             SELECT p.*, v.name, v.type, v.flag, v.suspicious, v.vessel_type, v.suspect_reason, v.notes
             FROM positions_history p
@@ -70,12 +71,36 @@ def get_live_positions(username: str = Depends(check_auth)):
             INNER JOIN (
                 SELECT mmsi, MAX(timestamp) as max_time
                 FROM positions_history
+                WHERE datetime(timestamp) > datetime('now', '-1 hour')
                 GROUP BY mmsi
             ) pm ON p.mmsi = pm.mmsi AND p.timestamp = pm.max_time
+            ORDER BY p.timestamp DESC
             LIMIT 500
         '''
         positions = conn.execute(query).fetchall()
         return [dict(p) for p in positions]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+@app.get("/api/vessels/trail/{mmsi}", response_model=Dict)
+def get_vessel_trail(mmsi: int, username: str = Depends(check_auth)):
+    try:
+        conn = get_db_connection()
+        # Trail das últimas 6 horas
+        query = '''
+            SELECT lat, lon, speed, course, true_heading, timestamp
+            FROM positions_history
+            WHERE mmsi = ? AND datetime(timestamp) > datetime('now', '-6 hours')
+            ORDER BY timestamp ASC
+        '''
+        trail = conn.execute(query, (mmsi,)).fetchall()
+        return {
+            "mmsi": mmsi,
+            "trail": [dict(p) for p in trail]
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:

@@ -57,7 +57,7 @@ Local skills: `/home/kaus/Desktop/Kaus_Test/.agent/skills/`
 - CORS aberto (`allow_origins=["*"]`) - desenvolvimento apenas
 - Todos os endpoints requerem Basic auth
 - Se servidor continuar em background após Ctrl+C: `pkill -f uvicorn`
-- O `.env` carrega de `../../.env` (dois níveis acima de `api_server.py`)
+- O `.env` carrega de `../.env` (mesma raiz do projeto)
 
 ## Important
 - Ativar venv **antes** de qualquer comando Python

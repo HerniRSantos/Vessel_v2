@@ -4,17 +4,28 @@ import sys
 import os
 import signal
 import argparse
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
 
 # Definir os caminhos para os serviços do backend
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKEND_DIR = os.path.join(BASE_DIR, 'backend')
 CLOUDFLARED_BIN = os.path.join(BASE_DIR, '../cloudflared')
 
-SERVICES = [
-    {"name": "API Server (FastAPI)", "cmd": ["python3", "-m", "uvicorn", "backend.api_server:app", "--host", "0.0.0.0", "--port", "8000"]},
-    # {"name": "AIS Ingestor", "cmd": ["python3", "backend/ais_ingestor.py"]},
-    # {"name": "OSINT Worker", "cmd": ["python3", "backend/osint_enricher.py"]}
-]
+# Verificar se AIS_API_KEY está disponível
+AIS_API_KEY = os.getenv("AIS_API_KEY")
+if AIS_API_KEY:
+    SERVICES = [
+        {"name": "API Server (FastAPI)", "cmd": ["python3", "-m", "uvicorn", "backend.api_server:app", "--host", "0.0.0.0", "--port", "8000"]},
+        {"name": "AIS Ingestor", "cmd": ["python3", "backend/ais_ingestor.py"]},
+        {"name": "OSINT Enricher", "cmd": ["python3", "backend/osint_enricher.py"]},
+    ]
+else:
+    print("[WARNING] AIS_API_KEY não encontrada no .env - recolha AIS desativada")
+    SERVICES = [
+        {"name": "API Server (FastAPI)", "cmd": ["python3", "-m", "uvicorn", "backend.api_server:app", "--host", "0.0.0.0", "--port", "8000"]},
+    ]
 
 processes = []
 
