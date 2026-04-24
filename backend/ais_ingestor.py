@@ -162,7 +162,11 @@ async def process_ais_message(data_dict: dict):
 async def ais_listener():
     print(f"[AIS] Conectando ao Stream: {AIS_WEBSOCKET_URL}")
     
-    bbox = [[[-20, 20], [0, 60]]]
+    bbox = os.getenv("AIS_BBOX", "[[[-20, 20], [0, 60]]")
+    try:
+        bbox = json.loads(bbox)
+    except:
+        bbox = [[[-20, 20], [0, 60]]]
     
     while True:
         try:
